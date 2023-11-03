@@ -1,53 +1,79 @@
 from django.db import models
 from django.contrib.auth.models import User
-from datetime import datetime
+from django.utils import timezone
+from main.models import Profile, Department, Position
+from tinymce.models import HTMLField
 
 # Create your models here.
-
-class Profile(models.Model):
-    user = models.ForeignKey(User)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField()
-    age = models.PositiveIntegerField()
-    date_of_entry = models.DateField()
-    address = models.CharField(max_length=100)
-    phone_number = models.CharField(max_length=100)
-    reference = models.CharField(max_length=100) #You could remove this if its not necessary
-    salary = models.PositiveIntegerField()
-    job_role = models.CharField(max_length=100)
-
+class Site(models.Model):
+    title = models.CharField(max_length=100, null=True, blank=True, verbose_name="Site Title")
+    tagline = models.CharField(max_length=100, null=True, blank=True, verbose_name="Site Tagline")
+    logo = models.ImageField(upload_to="site/logo/", null=True, blank=True)
+    about = HTMLField(null=True, blank=True, verbose_name="About Organization")
+    objectives = HTMLField(null=True, blank=True)
+    mission = HTMLField(null=True, blank=True)
+    created = models.DateTimeField(default=timezone.now)
+    last_modified = models.DateTimeField(auto_now=True, null=True)
+    class Meta:
+        ordering = ['-created']
     def __str__(self):
-        return str(self.name)
-
-    # Bank details ... Is it necessary?
+        return str(self.title)
+    
 
 
 class Event(models.Model):
     organizer = models.ForeignKey(Profile, on_delete=models.CASCADE)  # This is the person who created it
-    
     title = models.CharField(max_length=256)
-    description = models.TextField()
-    date = models.DateTimeField()
-    location = models.CharField(max_length=256) # If its online or Live ... should be specified
-
+    description = HTMLField(null=True, blank=True)
+    date = models.DateTimeField(default=timezone.now)
+    type = models.CharField(max_length=50, choices = (
+        ("open", "open"),
+        ("invitation", "invitation")
+    ))
+    location = models.CharField(max_length=256, null=True, blank=True) # Can serve for both link and venue
+    link = models.URLField(null=True, blank=True)
+    invitation = models.FileField(upload_to="events/invitations/", null=True, blank=True)
+    directions = HTMLField(null=True, blank=True) # optional field
+    invitees = models.ManyToManyField(Profile, related_name="event_invited")
+    attending = models.ManyToManyField(Profile, related_name="event_attending")
     def __str__(self):
         return str(self.title)
+    class Meta:
+        ordering = ['-date']
 
+class Meeting(models.Model):
+    title = models.CharField(max_length=256)
+    description = HTMLField(null=True, blank=True)
+    departments = models.ManyToManyField(Department, related_name="meetings")
+    members = models.ManyToManyField(Position, related_name="meetings_invited")
+    attended_by = models.ManyToManyField(Position, related_name="meetings_attended")
+    date = models.DateTimeField(default=timezone.now)
+    def __str__(self):
+        return str(self.title)
+    class Meta:
+        ordering = ['-date']
+
+
+class NewsCategory(models.Model):
+    title = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    def __str__(self):
+        return str(self.title)
+    class Meta:
+        ordering = ['title']
 
 class News(models.Model):
     author = models.ForeignKey(Profile, on_delete=models.CASCADE)
-    post = models.TextField()
-    date = models.DateTimeField(default=datetime.now())
-    category = models.CharField(choices=()) 
-    featured = models.BooleanField(default=False)
+    title = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True, null=True, blank=True)
+    post = HTMLField()
+    date = models.DateTimeField(default=timezone.now)
+    category = models.ForeignKey(NewsCategory, on_delete=models.DO_NOTHING, related_name="news", choices=()) 
+    active = models.BooleanField(default=True)
     verified = models.BooleanField(default=False)
-
     def __str__(self):
-        return str(self.author) # Cant return post as it may include images...we can strip that sha
+        return self.title
+    class Meta:
+        ordering = ['-date']
 
-
-class Rewards(models.Model):
-    name = models.ForeignKey(User, on_delete=models.PROTECT) 
-    reward_type = models.CharField(max_length=100)
     
